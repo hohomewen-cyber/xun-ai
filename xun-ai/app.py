@@ -14,7 +14,7 @@ import json
 # 页面配置（必须在最前面）
 # =========================
 st.set_page_config(
-    page_title="熏赔惨AI全能助手",
+    page_title="熏陪餐AI全能助手",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -80,7 +80,7 @@ def login_page():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🤖 熏赔惨AI全能助手</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">🤖 熏陪餐AI全能助手</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-subtitle">请输入您的API密钥开始使用</div>', unsafe_allow_html=True)
 
     with st.form("login_form"):
@@ -350,7 +350,7 @@ def call_model_with_memory(user_message: str) -> str:
     try:
         messages = []
 
-        system_prompt = """你是一个友好的AI助手，名叫"熏赔惨"。你需要记住之前的对话内容，保持对话的连贯性。
+        system_prompt = """你是一个友好的AI助手，名叫"熏陪餐"。你需要记住之前的对话内容，保持对话的连贯性。
 请用中文回答，语气亲切自然，像朋友一样聊天。如果用户提到之前说过的话题，要能够回忆起相关内容。"""
         messages.append({"role": "system", "content": system_prompt})
 
@@ -405,7 +405,7 @@ def handle_music_command(command: str) -> str:
                 result_text += "\n💡 **提示**：输入序号（如：1）即可播放"
                 return result_text
             return f"❌ 未找到歌曲：{keyword}"
-        return "请输入要搜索的歌曲名，例如：搜索 稻香"
+        return "请输入要搜索的歌曲名，例如：搜索 恋人"
 
     elif "b站" in command_lower or "bilibili" in command_lower:
         keyword = command.replace("B站", "").replace("b站", "").replace("bilibili", "").strip()
@@ -413,7 +413,7 @@ def handle_music_command(command: str) -> str:
             bilibili_url = f"https://www.bilibili.com/search?keyword={quote(keyword + ' 原版')}"
             webbrowser.open_new_tab(bilibili_url)
             return f"🎬 已在B站打开「{keyword}」的搜索结果\n\n🔗 链接：{bilibili_url}"
-        return "请输入要搜索的内容，例如：B站 稻香"
+        return "请输入要搜索的内容，例如：B站 恋人"
 
     elif command_lower.isdigit() or (
             command_lower.startswith("播放") and command_lower.replace("播放", "").strip().isdigit()):
@@ -510,7 +510,7 @@ def main_app():
     """主应用界面"""
     # 侧边栏
     with st.sidebar:
-        st.title("熏醅惨🤖 AI全能助手")
+        st.title("熏陪餐🤖 AI全能助手")
         st.markdown("---")
 
         st.success(f"✅ 已登录")
@@ -603,7 +603,7 @@ def main_app():
         # 聊天模式
         else:
             st.markdown("### 💬 聊天说明")
-            st.info("直接输入任何内容，熏醅惨会智能回复你！")
+            st.info("直接输入任何内容，熏陪餐会智能回复你！")
 
             if st.session_state.conversation_history:
                 st.markdown("---")
@@ -639,8 +639,8 @@ def main_app():
 
     # 输入框
     placeholder_texts = {
-        "chat": "💬 请输入消息... (熏醅惨祝您使用愉快！)",
-        "music": "🎵 输入「搜索 稻香」或输入序号（如：1）播放...",
+        "chat": "💬 请输入消息... (熏陪餐祝您使用愉快！)",
+        "music": "🎵 输入「搜索 恋人」或输入序号（如：1）播放...",
         "video": "🎬 直接粘贴链接或输入视频名..."
     }
 
@@ -683,7 +683,7 @@ def main_app():
         st.caption("💡 **提示**：我会记住我们之前的对话内容，你可以随时引用之前说过的话题！")
     else:
         st.caption(
-            "欢迎进入熏醅惨AI智障小助手！💡 **提示**：音乐模式支持网易云音乐播放和B站原版MV搜索，视频模式支持直接粘贴链接播放")
+            "欢迎进入熏陪餐AI智障小助手！💡 **提示**：音乐模式支持网易云音乐播放和B站原版MV搜索，视频模式支持直接粘贴链接播放")
 
 
 # =========================
