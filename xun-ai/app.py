@@ -12,9 +12,9 @@ import json
 
 # =========================
 # 页面配置（必须在最前面）
-# =========================
+# ========================
 st.set_page_config(
-    page_title="熏陪餐AI全能助手",
+    page_title="熏赔惨AI全能助手",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -80,7 +80,7 @@ def login_page():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🤖 熏陪餐AI全能助手</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">🤖 熏赔惨AI全能助手</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-subtitle">请输入您的API密钥开始使用</div>', unsafe_allow_html=True)
 
     with st.form("login_form"):
@@ -109,7 +109,8 @@ def login_page():
                 test_response = test_client.chat.completions.create(
                     model="qwen-plus",
                     messages=[{"role": "user", "content": "测试"}],
-                    max_tokens=10
+                    max_tokens=10,
+                    timeout=30
                 )
                 st.session_state.api_key = api_key.strip()
                 st.session_state.client = test_client
@@ -339,47 +340,90 @@ class YouTubeMusicPlayer:
 
 
 # =========================
-# 聊天模型（带记忆功能）
+# 聊天模型（带记忆功能 - 优化版）
 # =========================
 def call_model_with_memory(user_message: str) -> str:
-    """调用千问大模型，带上下文记忆"""
+    """调用千问大模型，带上下文记忆（优化版：增加超时和重试）"""
     client = get_client()
     if client is None:
         return "❌ API密钥未配置，请重新登录"
 
-    try:
-        messages = []
+    # 重试配置
+    max_retries = 3
+    retry_delay = 2  # 秒
+    
+    for attempt in range(max_retries):
+        try:
+            messages = []
 
-        system_prompt = """你是一个友好的AI助手，名叫"熏陪餐"。你需要记住之前的对话内容，保持对话的连贯性。
+            system_prompt = """你是一个友好的AI助手，名叫"熏赔惨"。你需要记住之前的对话内容，保持对话的连贯性。
 请用中文回答，语气亲切自然，像朋友一样聊天。如果用户提到之前说过的话题，要能够回忆起相关内容。"""
-        messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "system", "content": system_prompt})
 
-        recent_history = st.session_state.conversation_history[-10:] if st.session_state.conversation_history else []
-        for msg in recent_history:
-            messages.append(msg)
+            # 保留最近15轮对话（30条消息）避免token过长
+            recent_history = st.session_state.conversation_history[-30:] if st.session_state.conversation_history else []
+            for msg in recent_history:
+                messages.append(msg)
 
-        messages.append({"role": "user", "content": user_message})
+            messages.append({"role": "user", "content": user_message})
 
+            # 增加超时时间到60秒
+            response = client.chat.completions.create(
+                model="qwen-plus",
+                messages=messages,
+                max_tokens=800,
+                temperature=0.7,
+                timeout=60  # 增加到60秒
+            )
+
+            reply = response.choices[0].message.content
+
+            # 保存对话历史
+            st.session_state.conversation_history.append({"role": "user", "content": user_message})
+            st.session_state.conversation_history.append({"role": "assistant", "content": reply})
+
+            # 限制历史长度（最多保存20轮对话）
+            if len(st.session_state.conversation_history) > 40:
+                st.session_state.conversation_history = st.session_state.conversation_history[-40:]
+
+            return reply
+
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            return f"⏰ 网络超时（已重试{max_retries}次），请稍后再试\n\n💡 建议：\n- 检查网络连接\n- 稍后重试"
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            error_msg = str(e)
+            if "timeout" in error_msg.lower():
+                return f"⏰ 请求超时，请稍后重试\n\n详细信息：{error_msg}"
+            return f"❌ 模型调用失败: {error_msg}\n\n💡 建议：\n- 检查API Key是否有效\n- 检查网络连接\n- 稍后重试"
+    
+    return "❌ 调用失败，请稍后重试"
+
+
+# =========================
+# 健康检查函数
+# =========================
+def check_api_health():
+    """检查API健康状态"""
+    try:
+        client = get_client()
+        if client is None:
+            return False, "API客户端未初始化"
+        # 快速测试
         response = client.chat.completions.create(
             model="qwen-plus",
-            messages=messages,
-            max_tokens=800,
-            temperature=0.7,
+            messages=[{"role": "user", "content": "测试"}],
+            max_tokens=5,
             timeout=10
         )
-
-        reply = response.choices[0].message.content
-
-        st.session_state.conversation_history.append({"role": "user", "content": user_message})
-        st.session_state.conversation_history.append({"role": "assistant", "content": reply})
-
-        if len(st.session_state.conversation_history) > 20:
-            st.session_state.conversation_history = st.session_state.conversation_history[-20:]
-
-        return reply
-
+        return True, "连接正常 ✅"
     except Exception as e:
-        return f"模型调用失败: {e}\n请检查API Key配置"
+        return False, f"连接异常: {str(e)[:100]}"
 
 
 # =========================
@@ -405,7 +449,7 @@ def handle_music_command(command: str) -> str:
                 result_text += "\n💡 **提示**：输入序号（如：1）即可播放"
                 return result_text
             return f"❌ 未找到歌曲：{keyword}"
-        return "请输入要搜索的歌曲名，例如：搜索 恋人"
+        return "请输入要搜索的歌曲名，例如：搜索 稻香"
 
     elif "b站" in command_lower or "bilibili" in command_lower:
         keyword = command.replace("B站", "").replace("b站", "").replace("bilibili", "").strip()
@@ -413,7 +457,7 @@ def handle_music_command(command: str) -> str:
             bilibili_url = f"https://www.bilibili.com/search?keyword={quote(keyword + ' 原版')}"
             webbrowser.open_new_tab(bilibili_url)
             return f"🎬 已在B站打开「{keyword}」的搜索结果\n\n🔗 链接：{bilibili_url}"
-        return "请输入要搜索的内容，例如：B站 恋人"
+        return "请输入要搜索的内容，例如：B站 稻香"
 
     elif command_lower.isdigit() or (
             command_lower.startswith("播放") and command_lower.replace("播放", "").strip().isdigit()):
@@ -510,10 +554,26 @@ def main_app():
     """主应用界面"""
     # 侧边栏
     with st.sidebar:
-        st.title("熏陪餐🤖 AI全能助手")
+        st.title("熏醅惨🤖 AI全能助手")
         st.markdown("---")
 
         st.success(f"✅ 已登录")
+        
+        # 添加健康检查按钮
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔍 检查API", use_container_width=True, key="check_api"):
+                status, msg = check_api_health()
+                if "正常" in msg:
+                    st.success(f"✅ {msg}")
+                else:
+                    st.error(f"❌ {msg}")
+        with col2:
+            if st.button("🗑️ 清空记录", use_container_width=True, key="clear_conv"):
+                st.session_state.conversation_history = []
+                st.success("✅ 对话记忆已清空")
+                st.rerun()
+        
         st.markdown("---")
 
         # 模式选择
@@ -591,7 +651,7 @@ def main_app():
             - 直接粘贴链接即可播放（支持腾讯、爱奇艺、优酷）
             - 输入「搜索 视频名」获取各平台链接
             - 直接输入视频名自动搜索
-    例如：仙逆133集的完整链接：https://v.qq.com/x/cover/mzc00200aaogpgh/q4102uru4gc.html
+            例如：仙逆133集的完整链接：https://v.qq.com/x/cover/mzc00200aaogpgh/q4102uru4gc.html
             --复制到聊天框发送即可！
 
             **✨ 功能特点：**
@@ -603,13 +663,15 @@ def main_app():
         # 聊天模式
         else:
             st.markdown("### 💬 聊天说明")
-            st.info("直接输入任何内容，熏陪餐会智能回复你！")
-
+            st.info("直接输入任何内容，熏醅惨会智能回复你！")
+            
+            # 显示对话统计
             if st.session_state.conversation_history:
                 st.markdown("---")
                 st.markdown("### 📝 对话统计")
                 st.caption(f"已记录 {len(st.session_state.conversation_history) // 2} 轮对话")
-
+                
+                # 添加清空按钮
                 if st.button("🗑️ 清空对话记忆", use_container_width=True):
                     st.session_state.conversation_history = []
                     st.rerun()
@@ -624,10 +686,6 @@ def main_app():
             st.session_state.messages = []
             st.rerun()
 
-        if st.button("🗑️ 清空聊天记录", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-
     # 主界面
     st.markdown(f"### {mode_icons[st.session_state.mode]} {mode_names[st.session_state.mode]}")
     st.markdown("---")
@@ -639,8 +697,8 @@ def main_app():
 
     # 输入框
     placeholder_texts = {
-        "chat": "💬 请输入消息... (熏陪餐祝您使用愉快！)",
-        "music": "🎵 输入「搜索 恋人」或输入序号（如：1）播放...",
+        "chat": "💬 请输入消息... (熏醅惨祝您使用愉快！)",
+        "music": "🎵 输入「搜索 稻香」或输入序号（如：1）播放...",
         "video": "🎬 直接粘贴链接或输入视频名..."
     }
 
@@ -653,7 +711,7 @@ def main_app():
 
         # 生成响应
         with st.chat_message("assistant"):
-            with st.spinner("思考中..."):
+            with st.spinner("🤔 思考中..."):
                 try:
                     if st.session_state.mode == "music":
                         response = handle_music_command(prompt)
@@ -682,8 +740,7 @@ def main_app():
     if st.session_state.mode == "chat":
         st.caption("💡 **提示**：我会记住我们之前的对话内容，你可以随时引用之前说过的话题！")
     else:
-        st.caption(
-            "欢迎进入熏陪餐AI智障小助手！💡 **提示**：音乐模式支持网易云音乐播放和B站原版MV搜索，视频模式支持直接粘贴链接播放")
+        st.caption("欢迎进入熏醅惨AI智障小助手！💡 **提示**：音乐模式支持网易云音乐播放和B站原版MV搜索，视频模式支持直接粘贴链接播放")
 
 
 # =========================
